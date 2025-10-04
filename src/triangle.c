@@ -12,80 +12,6 @@ float clamp(float value, float min, float max) {
   return value;
 }
 
-void fill_flat_bottom_triangle(int x0, int y0, int x1, int y1, int x2, int y2,
-                               color_t color) {
-  float inv_slope1 = (x1 - x0) / (float)(y1 - y0);
-  float inv_slope2 = (x2 - x0) / (float)(y2 - y0);
-
-  float x_start = x0;
-  float x_end = x0;
-
-  for (int y = y0; y <= y2; y++) {
-    draw_line(x_start, y, x_end, y, color);
-    x_start += inv_slope1;
-    x_end += inv_slope2;
-  }
-}
-
-void fill_flat_top_triangle(int x0, int y0, int x1, int y1, int x2, int y2,
-                            color_t color) {
-  float inv_slope1 = (x0 - x2) / (float)(y0 - y2);
-  float inv_slope2 = (x1 - x2) / (float)(y1 - y2);
-
-  float x_start = x2;
-  float x_end = x2;
-
-  for (int y = y2; y >= y0; y--) {
-    draw_line(x_start, y, x_end, y, color);
-    x_start -= inv_slope1;
-    x_end -= inv_slope2;
-  }
-}
-
-void draw_filled_triangle(triangle_t triangle) {
-  int x0 = triangle.points[0].x, y0 = triangle.points[0].y;
-  int x1 = triangle.points[1].x, y1 = triangle.points[1].y;
-  int x2 = triangle.points[2].x, y2 = triangle.points[2].y;
-
-  if (y0 > y1) {
-    swap_int(&x0, &x1);
-    swap_int(&y0, &y1);
-  }
-  if (y1 > y2) {
-    swap_int(&x1, &x2);
-    swap_int(&y1, &y2);
-  }
-  if (y0 > y1) {
-    swap_int(&x0, &x1);
-    swap_int(&y0, &y1);
-  }
-
-  if (y1 == y2) {
-    fill_flat_bottom_triangle(x0, y0, x1, y1, x2, y2, triangle.color);
-    return;
-  }
-
-  if (y0 == y1) {
-    fill_flat_top_triangle(x0, y0, x1, y1, x2, y2, triangle.color);
-    return;
-  }
-
-  int My = y1;
-  int Mx = (x2 - x0) * (y1 - y0) / (float)(y2 - y0) + x0;
-
-  fill_flat_bottom_triangle(x0, y0, x1, y1, Mx, My, triangle.color);
-  fill_flat_top_triangle(x1, y1, Mx, My, x2, y2, triangle.color);
-}
-
-void draw_triangle(triangle_t triangle, color_t color) {
-  draw_line(triangle.points[0].x, triangle.points[0].y, triangle.points[1].x,
-            triangle.points[1].y, color);
-  draw_line(triangle.points[1].x, triangle.points[1].y, triangle.points[2].x,
-            triangle.points[2].y, color);
-  draw_line(triangle.points[2].x, triangle.points[2].y, triangle.points[0].x,
-            triangle.points[0].y, color);
-}
-
 vec3_t barycentric_weights(vec2_t a, vec2_t b, vec2_t c, vec2_t p) {
   vec2_t ac = vec2_sub(c, a);
   vec2_t ab = vec2_sub(b, a);
@@ -102,6 +28,128 @@ vec3_t barycentric_weights(vec2_t a, vec2_t b, vec2_t c, vec2_t p) {
   vec3_t weights = {alpha, beta, gamma};
   return weights;
 }
+
+// FILLED TRIANGLE
+
+void draw_filled_pixel(int x, int y, triangle_t triangle) {
+  vec4_t point_a = triangle.points[0];
+  vec4_t point_b = triangle.points[1];
+  vec4_t point_c = triangle.points[2];
+
+  vec2_t a = vec2_from_vec4(triangle.points[0]);
+  vec2_t b = vec2_from_vec4(triangle.points[1]);
+  vec2_t c = vec2_from_vec4(triangle.points[2]);
+  vec2_t p = {x, y};
+  vec3_t weights = barycentric_weights(a, b, c, p);
+
+  float alpha = weights.x;
+  float beta = weights.y;
+  float gamma = weights.z;
+
+  float interpolated_1_w = (1 / point_a.w) * alpha + (1 / point_b.w) * beta +
+                           (1 / point_c.w) * gamma;
+
+  interpolated_1_w = 1.0 - interpolated_1_w;
+
+  if (interpolated_1_w < z_buffer[(window_width * y) + x]) {
+    draw_pixel(x, y, triangle.color);
+    z_buffer[(window_width * y) + x] = interpolated_1_w;
+  }
+}
+
+void draw_filled_triangle(triangle_t triangle) {
+  int x0 = triangle.points[0].x, y0 = triangle.points[0].y;
+  int x1 = triangle.points[1].x, y1 = triangle.points[1].y;
+  int x2 = triangle.points[2].x, y2 = triangle.points[2].y;
+  float z0 = triangle.points[0].z, w0 = triangle.points[0].w;
+  float z1 = triangle.points[1].z, w1 = triangle.points[1].w;
+  float z2 = triangle.points[2].z, w2 = triangle.points[2].w;
+
+  // Sort vertices (y0 < y1 < y2)
+  if (y0 > y1) {
+    swap_int(&x0, &x1);
+    swap_int(&y0, &y1);
+    swap_float(&z0, &z1);
+    swap_float(&w0, &w1);
+  }
+  if (y1 > y2) {
+    swap_int(&x1, &x2);
+    swap_int(&y1, &y2);
+    swap_float(&z1, &z2);
+    swap_float(&w1, &w2);
+  }
+  if (y0 > y1) {
+    swap_int(&x0, &x1);
+    swap_int(&y0, &y1);
+    swap_float(&z0, &z1);
+    swap_float(&w0, &w1);
+  }
+
+  // Render flat-bottom filled triangle
+  float inv_slope_1 = 0;
+  float inv_slope_2 = 0;
+
+  if (y1 - y0 != 0) {
+    inv_slope_1 = (float)(x1 - x0) / abs(y1 - y0);
+  }
+  if (y2 - y0 != 0) {
+    inv_slope_2 = (float)(x2 - x0) / abs(y2 - y0);
+  }
+
+  if (y1 - y0 != 0) {
+    for (int y = y0; y <= y1; y++) {
+      int x_start = x1 + (y - y1) * inv_slope_1;
+      int x_end = x0 + (y - y0) * inv_slope_2;
+
+      if (x_end < x_start) {
+        swap_int(&x_start, &x_end);
+      }
+
+      for (int x = x_start; x <= x_end; x++) {
+        draw_filled_pixel(x, y, triangle);
+      }
+    }
+  }
+
+  // Render flat-top filled triangle
+  inv_slope_1 = 0;
+  inv_slope_2 = 0;
+
+  if (y2 - y1 != 0) {
+    inv_slope_1 = (float)(x2 - x1) / abs(y2 - y1);
+  }
+  if (y2 - y0 != 0) {
+    inv_slope_2 = (float)(x2 - x0) / abs(y2 - y0);
+  }
+
+  if (y2 - y1 != 0) {
+    for (int y = y1; y <= y2; y++) {
+      int x_start = x1 + (y - y1) * inv_slope_1;
+      int x_end = x0 + (y - y0) * inv_slope_2;
+
+      if (x_end < x_start) {
+        swap_int(&x_start, &x_end);
+      }
+
+      for (int x = x_start; x <= x_end; x++) {
+        draw_filled_pixel(x, y, triangle);
+      }
+    }
+  }
+}
+
+// OUTLINED TRIANGLE
+
+void draw_triangle(triangle_t triangle, color_t color) {
+  draw_line(triangle.points[0].x, triangle.points[0].y, triangle.points[1].x,
+            triangle.points[1].y, color);
+  draw_line(triangle.points[1].x, triangle.points[1].y, triangle.points[2].x,
+            triangle.points[2].y, color);
+  draw_line(triangle.points[2].x, triangle.points[2].y, triangle.points[0].x,
+            triangle.points[0].y, color);
+}
+
+// TEXTURED TRIANGLE
 
 void draw_texel(int x, int y, triangle_t triangle, uint32_t *texture) {
   vec4_t point_a = triangle.points[0];
@@ -138,7 +186,12 @@ void draw_texel(int x, int y, triangle_t triangle, uint32_t *texture) {
   int tex_x = abs(clamp(interpolated_u, 0, 1) * texture_width);
   int tex_y = abs(clamp(1 - interpolated_v, 0, 1) * texture_height);
 
-  draw_pixel(x, y, texture[tex_y * texture_width + tex_x]);
+  interpolated_1_w = 1.0 - interpolated_1_w;
+
+  if (interpolated_1_w < z_buffer[(window_width * y) + x]) {
+    draw_pixel(x, y, texture[tex_y * texture_width + tex_x]);
+    z_buffer[(window_width * y) + x] = interpolated_1_w;
+  }
 }
 
 void draw_textured_triangle(triangle_t triangle, uint32_t *texture) {

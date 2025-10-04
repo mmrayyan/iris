@@ -20,7 +20,7 @@ It implements the fundamentals of a 3D rendering pipeline without relying on ext
 - [x] Flat shading
 - [x] Texture loading and mapping (PNG loading using [uPNG](https://github.com/elanthis/upng))
 - [x] Perspective-correct interpolation of UV coordinates
-- [ ] Depth-based rendering using a Z-buffer
+- [x] Depth-based rendering using a Z-buffer
 - [ ] Camera space and Movement
 - [ ] Frustum clipping
 - [ ] Rendering multiple meshes simultaneously
@@ -31,11 +31,11 @@ It implements the fundamentals of a 3D rendering pipeline without relying on ext
 
 🚧 This section lists upcoming changes and improvements targeted for the next minor version 🚧
 
-- [ ] Refactoring and Code comments
+- [x] Refactoring and Code comments
 - [x] Texture mapping
 - [x] Implement PNG decoding
 - [x] Textured OBJ files
-- [ ] Update painter's algorithm to Z-buffering
+- [x] Update painter's algorithm to Z-buffering
 
 ---
 

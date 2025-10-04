@@ -17,7 +17,9 @@ int previous_frame_time = 0;
 vec3_t camera_position = {0, 0, 0};
 mat4_t proj_matrix;
 
-triangle_t *triangles_to_render = NULL;
+#define MAX_TRIANGLES 10000
+triangle_t triangles_to_render[MAX_TRIANGLES];
+int num_triangles = 0;
 
 enum cull_method cull_method;
 enum render_method render_method;
@@ -30,6 +32,8 @@ void setup(void) {
   color_buffer_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
                                            SDL_TEXTUREACCESS_STREAMING,
                                            window_width, window_height);
+
+  z_buffer = malloc(sizeof(float) * window_width * window_height);
 
   float fov = M_PI / 3.0;
   float aspect = window_height / (float)window_width;
@@ -81,7 +85,7 @@ void update(void) {
 
   previous_frame_time = SDL_GetTicks();
 
-  triangles_to_render = NULL;
+  num_triangles = 0;
 
   mesh.rotation.x = -M_PI / 6.0;
   mesh.rotation.y += 0.02;
@@ -153,10 +157,6 @@ void update(void) {
         -vec3_dot(normal, vec3_normalize(light.direction));
     color_t triangle_color =
         light_apply_intensity(mesh_face.color, light_intensity_factor);
-    float triangle_average_depth =
-        (transformed_vertices[0].z + transformed_vertices[1].z +
-         transformed_vertices[2].z) /
-        3.0;
 
     triangle_t projected_triangle = {
         .points =
@@ -174,21 +174,10 @@ void update(void) {
                 {mesh_face.b_uv.u, mesh_face.b_uv.v},
                 {mesh_face.c_uv.u, mesh_face.c_uv.v},
             },
-        .color = triangle_color,
-        .average_depth = triangle_average_depth};
+        .color = triangle_color};
 
-    array_push(triangles_to_render, projected_triangle);
-
-    int num_triangles = array_length(triangles_to_render);
-    for (size_t i = 0; i < num_triangles; i++) {
-      for (size_t j = i; j < num_triangles; j++) {
-        if (triangles_to_render[i].average_depth <
-            triangles_to_render[j].average_depth) {
-          triangle_t temp = triangles_to_render[i];
-          triangles_to_render[i] = triangles_to_render[j];
-          triangles_to_render[j] = temp;
-        }
-      }
+    if (num_triangles < MAX_TRIANGLES) {
+      triangles_to_render[num_triangles++] = projected_triangle;
     }
   }
 }
@@ -196,7 +185,6 @@ void update(void) {
 void render(void) {
   draw_grid(10, 0xff353535);
 
-  int num_triangles = array_length(triangles_to_render);
   for (size_t i = 0; i < num_triangles; i++) {
     triangle_t triangle = triangles_to_render[i];
 
@@ -226,15 +214,15 @@ void render(void) {
     }
   }
 
-  array_free(triangles_to_render);
-
   render_color_buffer();
   clear_color_buffer(0xff656565);
+  clear_z_buffer();
   SDL_RenderPresent(renderer);
 }
 
 void free_resources(void) {
   free(color_buffer);
+  free(z_buffer);
   upng_free(png_texture);
   array_free(mesh.faces);
   array_free(mesh.vertices);

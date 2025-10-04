@@ -30,6 +30,7 @@ extern enum render_method render_method;
 extern SDL_Window *window;
 extern SDL_Renderer *renderer;
 extern uint32_t *color_buffer;
+extern float *z_buffer;
 extern SDL_Texture *color_buffer_texture;
 extern const int window_width;
 extern const int window_height;
@@ -39,5 +40,6 @@ void destroy_window(void);
 
 void render_color_buffer(void);
 void clear_color_buffer(color_t color);
+void clear_z_buffer();
 
 #endif

@@ -20,7 +20,6 @@ typedef struct {
   vec4_t points[3];
   tex2_t texcoords[3];
   color_t color;
-  float average_depth;
 } triangle_t;
 
 void draw_triangle(triangle_t triangle, color_t color);
