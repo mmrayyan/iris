@@ -1,5 +1,5 @@
 CC = gcc
-SRC = ./src/main.c ./src/display.c ./src/vector.c ./src/mesh.c ./src/triangle.c ./src/array.c ./src/draw.c ./src/matrix.c ./src/color.c ./src/light.c
+SRC = ./src/main.c ./src/display.c ./src/vector.c ./src/mesh.c ./src/triangle.c ./src/array.c ./src/draw.c ./src/matrix.c ./src/color.c ./src/light.c ./src/texture.c ./src/swap.c ./src/upng.c
 OUT = ./build/iris
 CFLAGS = -Wall
 LDFLAGS = -lmingw32 -lSDL2main -lSDL2
